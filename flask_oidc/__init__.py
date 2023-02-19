@@ -32,6 +32,7 @@ from copy import copy
 import logging
 from warnings import warn
 import calendar
+import requests
 
 from six.moves.urllib.parse import urlencode
 from flask import request, session, redirect, url_for, g, current_app, abort
@@ -909,6 +910,8 @@ class OpenIDConnect(object):
         if hint != 'none':
             request['token_type_hint'] = hint
 
+        url=self.client_secrets['token_introspection_uri']
+
         auth_method = current_app.config['OIDC_INTROSPECTION_AUTH_METHOD'] 
         if (auth_method == 'client_secret_basic'):
             basic_auth_string = '%s:%s' % (self.client_secrets['client_id'], self.client_secrets['client_secret'])
@@ -920,9 +923,10 @@ class OpenIDConnect(object):
             request['client_id'] = self.client_secrets['client_id']
             if self.client_secrets['client_secret'] is not None:
                 request['client_secret'] = self.client_secrets['client_secret']
+        elif (auth_method == 'client_secret_url'):
+            client_id=self.client_secrets['client_id']
+            client_secret=self.client_secrets['client_secret']
+            url=f"https://{client_id}:{client_secret}@{url.replace('https://','')}"
 
-        resp, content = httplib2.Http().request(
-            self.client_secrets['token_introspection_uri'], 'POST',
-            urlencode(request), headers=headers)
-        # TODO: Cache this reply
-        return _json_loads(content)
+        resp = requests.post(url,urlencode(request),headers=headers)
+        return _json_loads(resp.text)
